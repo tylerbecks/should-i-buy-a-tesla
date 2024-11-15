@@ -25,6 +25,7 @@ class TeslaScraper:
         self.headless = headless
         self.driver = self._setup_driver()
         self.data_list = []
+        self.is_new_vehicle_page = 'inventory/new' in self.url
 
     def _setup_driver(self):
         """
@@ -100,20 +101,20 @@ class TeslaScraper:
         """
         try:
             # Extract data from each listing
-            model_info = listing.find_element(By.CSS_SELECTOR, '.result-header h3.tds-text--h4').text.strip()
+            model = self._get_model(listing)
+            year = int(self._get_year(listing))
             trim = listing.find_element(By.CSS_SELECTOR, '.result-header .tds-text_color--10').text.strip()
-            year = model_info.split()[0]
-            model_name = ' '.join(model_info.split()[1:])
 
             # Price
             price_element = listing.find_element(By.CLASS_NAME, 'result-purchase-price')
             price_text = price_element.text.strip().replace('$', '').replace(',', '')
             price = int(price_text)
 
+            # Price after tax credit
+            price_after_tax_credit = self._get_price_after_tax_credit(listing)
+
             # Mileage
-            mileage_element = listing.find_element(By.CSS_SELECTOR, ".result-basic-info div > span")
-            mileage_text = mileage_element.text.strip().replace(' mile odometer', '').replace(',', '')
-            mileage = int(mileage_text)
+            mileage = self._get_mileage(listing)
 
             # VIN
             data_id = listing.get_attribute('data-id')
@@ -121,8 +122,7 @@ class TeslaScraper:
             vin = data_id.split('-')[0]
 
             # Clean History/has accident
-            history_icon = listing.find_elements(By.CLASS_NAME, 'inventory-icon--history-clean')
-            has_clean_history = len(history_icon) > 0
+            has_clean_history = self._get_has_clean_history(listing)
 
             # Full Self-Driving (FSD)
             fsd = listing.find_elements(By.CLASS_NAME, 'inventory-icon--autopilot-fsd')
@@ -140,9 +140,10 @@ class TeslaScraper:
             # Assemble data into a dictionary
             data = {
                 'Year': year,
-                'Model': model_name,
+                'Model': model,
                 'Trim': trim,
                 'Price': price,
+                'PriceAfterTaxCredit': price_after_tax_credit,
                 'Mileage': mileage,
                 'VIN': vin,
                 'CleanHistory': has_clean_history,
@@ -157,6 +158,49 @@ class TeslaScraper:
         except Exception as e:
             logging.error(f"Error extracting data from a listing: {e}")
             return None
+
+    def _get_model_info(self, listing):
+        return listing.find_element(By.CSS_SELECTOR, '.result-header h3.tds-text--h4').text.strip()
+
+    def _get_model(self, listing):
+        model_info = self._get_model_info(listing)
+        if self.is_new_vehicle_page:
+            return model_info
+        else:
+            return ' '.join(model_info.split()[1:])
+
+    def _get_year(self, listing):
+        if self.is_new_vehicle_page:
+            # return current year
+            return time.strftime('%Y')
+        else:
+            return self._get_model_info(listing).split()[0]
+        
+    def _get_mileage(self, listing):
+        if self.is_new_vehicle_page:
+            return 0
+
+        mileage_element = listing.find_element(By.CSS_SELECTOR, ".result-basic-info div > span")
+        mileage_text = mileage_element.text.strip().replace(' mile odometer', '').replace(',', '')
+        return int(mileage_text)
+    
+    def _get_price_after_tax_credit(self, listing):
+        # div.result-federal-incentive will always exist, but if there is no price after tax credit, it will be empty
+        # If there is a price, then .result-federal-incentive > div > span will contain the price
+        # eg # Example text: "$47,490 After Tax Credit"
+        try:
+            price_after_tax_credit_element = listing.find_element(By.CSS_SELECTOR, '.result-federal-incentive > div > span')
+            price_after_tax_credit_text = price_after_tax_credit_element.text.strip().replace('$', '').replace(',', '')
+            return int(price_after_tax_credit_text.split()[0].replace('$', '').replace(',', ''))
+        except:
+            return None
+    
+    def _get_has_clean_history(self, listing):
+        if self.is_new_vehicle_page:
+            return True
+
+        history_icon = listing.find_elements(By.CLASS_NAME, 'inventory-icon--history-clean')
+        return len(history_icon) > 0
 
     def extract_listings(self):
         """

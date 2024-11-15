@@ -32,17 +32,18 @@ class DataPersistence:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS inventory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                VIN TEXT UNIQUE,
-                Year TEXT,
-                Model TEXT,
-                Trim TEXT,
-                Price REAL,
-                Mileage INTEGER,
-                CleanHistory BOOLEAN,
-                FSD BOOLEAN,
-                ExteriorColor TEXT,
-                Wheels TEXT,
-                Interior TEXT
+                VIN TEXT UNIQUE NOT NULL,
+                Year INTEGER NOT NULL,
+                Model TEXT NOT NULL,
+                Trim TEXT NOT NULL,
+                Price INTEGER NOT NULL,
+                PriceAfterTaxCredit INTEGER,
+                Mileage INTEGER NOT NULL,
+                CleanHistory BOOLEAN NOT NULL,
+                FSD BOOLEAN NOT NULL,
+                ExteriorColor TEXT NOT NULL,
+                Wheels TEXT NOT NULL,
+                Interior TEXT NOT NULL
             )
         ''')
         conn.commit()
@@ -63,19 +64,20 @@ class DataPersistence:
                     data.get('Model'),
                     data.get('Trim'),
                     data.get('Price'),
+                    data.get('PriceAfterTaxCredit'),
                     data.get('Mileage'),
                     data.get('CleanHistory'),
                     data.get('FSD'),
                     data.get('ExteriorColor'),
                     data.get('Wheels'),
-                    data.get('Interior')
+                    data.get('Interior'),
                 )
 
                 # Insert data into the database
                 self.cursor.execute('''
                     INSERT OR IGNORE INTO inventory (
-                        VIN, Year, Model, Trim, Price, Mileage, CleanHistory, FSD, ExteriorColor, Wheels, Interior
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VIN, Year, Model, Trim, Price, PriceAfterTaxCredit, Mileage, CleanHistory, FSD, ExteriorColor, Wheels, Interior
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', vehicle_tuple)
                 self.conn.commit()
             except Exception as e:
